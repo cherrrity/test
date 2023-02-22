@@ -432,6 +432,7 @@ private extension Renderer {
         let rotationAngle = Float(cameraToDisplayRotation(orientation: orientation)) * .degreesToRadian
         return flipYZ * matrix_float4x4(simd_quaternion(rotationAngle, Float3(0, 0, 1)))
     }
+
     
     public func savePointsToFile() {
         

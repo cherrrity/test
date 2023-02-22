@@ -173,6 +173,9 @@ final class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelega
                         if let imageBuffer = self.session.currentFrame?.capturedImage {
                             self.debugImageView.image = UIImage(ciImage: CIImage(cvPixelBuffer: imageBuffer))
                         }
+                        
+                        self.drawVisionCentroidRequestResults()
+                    
                     }
                 })
             })
@@ -194,6 +197,7 @@ final class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelega
         // Create a world-tracking configuration, and
         // enable the scene depth frame-semantic.
         let configuration = ARWorldTrackingConfiguration()
+        configuration.planeDetection = []
         configuration.frameSemantics = [.sceneDepth, .smoothedSceneDepth]
         
         let selectedVideoFormat = ARWorldTrackingConfiguration.supportedVideoFormats[1]
@@ -201,7 +205,7 @@ final class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelega
         print(selectedVideoFormat) //imageResolution=(1920, 1080) framesPerSecond=(60) for iPhone 12 Pro
 
         // Run the view's session
-        session.run(configuration)
+        session.run(configuration, options: [.removeExistingAnchors, .resetTracking])
         
         // The screen shouldn't dim during AR experiences.
         UIApplication.shared.isIdleTimerDisabled = true
@@ -261,6 +265,27 @@ final class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelega
             alertController.addAction(restartAction)
             self.present(alertController, animated: true, completion: nil)
         }
+    }
+    
+    func drawVisionCentroidRequestResults() {
+        CATransaction.begin()
+        CATransaction.setValue(kCFBooleanTrue, forKey: kCATransactionDisableActions)
+        detectionOverlay.sublayers = nil // remove all the old recognized objects
+        
+        initAndClustering(points: self.session.currentFrame?.rawFeaturePoints?.points ?? []).forEach {
+            (point) in
+            
+            let objectBounds = VNImagePointForNormalizedPoint(CGPoint(x: CGFloat(point.x), y: CGFloat(point.y)), Int(bufferSize.width), Int(bufferSize.height))
+            
+            let shapeLayer = self.createRoundedCircleLayerWithBounds(objectBounds)
+            
+            //draw yolo bbox
+            detectionOverlay.addSublayer(shapeLayer)
+
+        }
+        
+        self.updateLayerGeometry()
+        CATransaction.commit()
     }
     
     func drawVisionRequestResults(_ results: [Any]) {
@@ -397,6 +422,14 @@ final class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelega
         shapeLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
         shapeLayer.name = "Found Object"
         shapeLayer.backgroundColor = CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(), components: [1.0, 1.0, 0.2, 0.4])
+        return shapeLayer
+    }
+    
+    func createRoundedCircleLayerWithBounds(_ bounds: CGPoint) -> CALayer {
+        let shapeLayer = CALayer()
+        shapeLayer.position = CGPoint(x: bounds.x, y: bounds.y)
+        shapeLayer.name = "Found Centroid"
+        shapeLayer.backgroundColor = CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(), components: [1.0, 0.0, 0.0, 0.4])
         return shapeLayer
     }
     
